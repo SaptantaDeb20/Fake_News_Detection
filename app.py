@@ -1,60 +1,44 @@
-from flask import Flask,request,render_template,jsonify
-import numpy as numpy
-import pandas as pd
+from flask import Flask, request, render_template, jsonify
+import os
 import pickle
-from sklearn.feature_extraction.text import TfidfVectorizer
 
-application=Flask(__name__)
-app=application
+application = Flask(__name__)
+app = application
 
-model=pickle.load(open('model/model_mnb.pkl','rb'))
-vector=pickle.load(open('model/vectorization.pkl','rb'))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+with open(os.path.join(BASE_DIR, 'model/model_lr.pkl'), 'rb') as f:
+    model = pickle.load(f)
+
+with open(os.path.join(BASE_DIR, 'model/vectorization.pkl'), 'rb') as f:
+    vector = pickle.load(f)
+
+print("Model Loaded")
+print("Vocab size:", len(vector.vocabulary_))
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# @app.route('/predictdata',methods=['GET','POST'])
-# def predict_datapoint():
-#      if request.is_json:
-#         data = request.get_json()
-#         news = data.get('news', '')
-
-#         result=model.predict(vector.transform([news]))
-#         if(result==1):
-#             result='1'
-#         else:
-#             result='0'
-
-
-#         return jsonify({result:"result"}), 200
-     
-#      else:
-#         return jsonify({result:"-1"}), 301
-
 @app.route('/predictdata', methods=['POST'])
 def predict_datapoint():
-    if not request.is_json:
-        return jsonify({"error": "Invalid request format. JSON expected."}), 400
-
-    data = request.get_json()
-    news = data.get('news', None)  
-
-
-    if not news:
-        return jsonify({"error": "The 'news' field is required and cannot be empty."}), 400
-
     try:
-        
-        result = model.predict(vector.transform([news]))
-        prediction = "1" if result[0] == 1 else "0"
+        data = request.get_json(force=True)
+        news = data.get('news', '').strip()
 
-        return jsonify({"result": prediction}), 200
+        if not news:
+            return jsonify({"error": "Empty input"}), 400
+
+        vec = vector.transform([news])
+
+        result = model.predict(vec)
+
+        prediction = "Real News" if result[0] == 1 else "Fake News"
+
+        return jsonify({"result": prediction})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-if __name__=="__main__":
-    app.run(host="0.0.0.0")
-
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
